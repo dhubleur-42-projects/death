@@ -1,4 +1,4 @@
-NAME		=	War
+NAME		=	Death
 TMP_NAME	=	build/$(NAME).tmp
 
 SRCS		= 	\
