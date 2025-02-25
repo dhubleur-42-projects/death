@@ -40,6 +40,7 @@
 %define OFFSET_FROM_PAGE_MASK 	0xFFF
 
 %define KEY_SIZE 10
+%define KEY_BYTE_SIZE KEY_SIZE * 8
 
 global _start
 

