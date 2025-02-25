@@ -39,6 +39,8 @@
 %define PAGE_SIZE 		0x1000
 %define OFFSET_FROM_PAGE_MASK 	0xFFF
 
+%define KEY_SIZE 10
+
 global _start
 
 struc linux_dirent64
