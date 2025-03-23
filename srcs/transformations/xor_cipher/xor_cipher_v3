@@ -5,7 +5,7 @@ xor_cipher:
 	xor r9, r9					; i_data = 0;
 
 	.loop:
-		cmp rsi, 0				; if (size == 0)
+		cmp r9, rsi, 			; if (i_data == size)
 		je .end					; 	goto .end
 
 		mov r10, rdx			; cur_key_ptr = key
