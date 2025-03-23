@@ -1,0 +1,8 @@
+_start:
+	%nop%
+begin:
+	%save_register% ; BE CAREFUl, IF PUSH SHUFFLE, POP SHUFFLE TOO
+	%call_uncipher%
+	%jmp_program_entry%
+xor_cipher:
+	%xor_cipher%
