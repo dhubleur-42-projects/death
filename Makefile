@@ -56,7 +56,7 @@ endif
 
 clean	:	
 	rm -Rf build/
-	rm srcs/final_main.s
+	rm -f srcs/final_main.s
 
 fclean	:	clean
 	rm -f ${NAME}
