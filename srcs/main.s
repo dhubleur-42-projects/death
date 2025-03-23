@@ -9,16 +9,18 @@ _start:
 
 begin:
 	; save all registers
-	push rax
-	push rdi
-	push rsi
-	push rdx
-	push rcx
-	push rbx
-	push r8
-	push r9
-	push r10
-	push r11
+push rax
+sub rsp, 24
+mov [rsp + 8], rsi
+mov [rsp + 16], rdi
+mov [rsp], rdx
+push rcx
+push rbx
+sub rsp, 32
+mov [rsp], r11
+mov [rsp + 16], r9
+mov [rsp + 24], r8
+mov [rsp + 8], r10
 
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
