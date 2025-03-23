@@ -29,7 +29,8 @@ begin:
 	je program_entry				; 	goto program_entry
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
-	jmp program_entry				; goto program_entry
+	cmp rax, rax
+	je program_entry				; goto program_entry
 
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
