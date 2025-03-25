@@ -40,7 +40,6 @@ build/%.o	:	srcs/%.s
 
 srcs/final_main.s	:	srcs/main.s
 	./tools/convert_payload.sh "$(NFLAGS)"
-	./tools/convert_variations.sh "$(NFLAGS)"
 
 $(TMP_NAME)	:	$(OBJS)
 	$(LD) $(OBJS) -o $(TMP_NAME)
