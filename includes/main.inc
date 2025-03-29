@@ -109,4 +109,4 @@ endstruc
 
 ; Compression
 %define COMPRESSION_TOKEN 127
-%define COMPRESSION_BUF_SIZE 2000
+%define COMPRESSION_BUF_SIZE 3000

