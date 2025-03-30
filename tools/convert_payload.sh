@@ -12,7 +12,7 @@ fi
 NASM_CMD="$NASM_CMD $1"
 
 declare -a VARIATIONS_LIST=(
-	[0]=push_regs
+	[0]=save_register
 )
 
 main()
@@ -138,7 +138,7 @@ update_final_main_with_variation()
 			VARIATION_SIZE=$size
 		else
 			if [ $VARIATION_SIZE -ne $size ]; then
-				echo "Variation size mismatch: $VARIATION_NAME"
+				echo "Variation size mismatch: $VARIATION_NAME for $FILE. Expected: $VARIATION_SIZE. Got: $size"
 				exit 1
 			fi
 		fi
