@@ -14,6 +14,7 @@ NASM_CMD="$NASM_CMD $1"
 declare -a VARIATIONS_LIST=(
 	[0]=save_register
 	[1]=call_uncipher
+	[2]=jmp_program_entry
 )
 
 main()
