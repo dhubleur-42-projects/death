@@ -4,6 +4,9 @@ xor_cipher:
 	push rcx					; save key_size
 	push rdx					; save key
 
+	push rax					; nop
+	pop rax						; ...
+
 	.loop:
 		cmp rsi, 0				; if (size == 0)
 		je .end					; 	goto .end
@@ -15,17 +18,22 @@ xor_cipher:
 
 		inc rdi					; data++
 		inc rdx					; key++
+		nop					; nop
 		dec rsi					; size--
 		dec rcx					; key_size--
 
 		cmp rcx, 0				; if (key_size == 0)
 		je .key_reset				; 	goto .key_reset
+		push rax				; nop
+		pop rax					; ...
 
 		jmp .loop				; goto .loop
 
 	.key_reset:
 		mov rdx, [rsp]				; restore key
 		mov rcx, [rsp + 8]			; ...
+		push rax				; nop
+		pop rax					; ...
 		jmp .loop				; goto .loop
 
 	.end:

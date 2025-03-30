@@ -2,6 +2,8 @@
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
 	xor r8, r8					; i_key = 0;
+	push rbp				; nop
+	pop rbp					; ...
 	xor r9, r9					; i_data = 0;
 
 	.loop:
@@ -14,6 +16,8 @@ xor_cipher:
 
 		mov r10, rdi			; cur_data_ptr = data
 		add r10, r9				; + i_data;
+		push rbp				; nop
+		pop rbp					; ...
 		mov al, [r10]			; al = *cur_data_ptr
 
 		xor al, bl				; al ^= bl

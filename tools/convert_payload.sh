@@ -15,6 +15,7 @@ declare -a VARIATIONS_LIST=(
 	[0]=save_register
 	[1]=call_uncipher
 	[2]=jmp_program_entry
+	[3]=xor_cipher
 )
 
 main()

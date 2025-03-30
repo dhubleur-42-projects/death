@@ -21,7 +21,7 @@ xor_cipher:
 
 		xor [r8], bl			; *cur_data_ptr ^= bl
 
-		cmp r9, rcx				; if (i_key == key_size) //This if is for je, some lines below. Shuffling code
+		cmp r9, rcx				; if (i_key == key_size) ; This if is for je, some lines below. Shuffling code
 		je .key_reset			; 	goto .key_reset
 
 		jmp .loop				; goto .loop

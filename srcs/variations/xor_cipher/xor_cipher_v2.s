@@ -2,6 +2,8 @@
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
 	push rcx					; save key_size
+	push rbp				; nop
+	pop rbp					; ...
 
 	.loop:
 		cmp rcx, 0				; if (key_size == 0)
@@ -10,15 +12,24 @@ xor_cipher:
 		cmp rsi, 0				; if (size == 0)
 		je .end					; 	goto .end
 
+		push rax				; nop
+		pop rax					; ...
+
 		mov r8b, [rdi]				; al = *data
 		mov r9b, [rdx]				; bl = *key
 		xor r8b, r9b				; al ^= bl
+		nop					; ...
 		mov [rdi], r8b				; *data = al
 
 		dec rsi					; size--
+		push rbp				; nop
+		pop rbp					; ...
 		inc rdx					; key++
 		inc rdi					; data++
 		dec rcx					; key_size--
+
+		push rax				; nop
+		pop rax					; ...
 
 		jmp .loop				; goto .loop
 
