@@ -1,5 +1,5 @@
 #!/bin/bash
-set -exuo pipefail
+set -euo pipefail
 PROJECT_FOLDER="$(realpath -- $(dirname -- "${BASH_SOURCE:-$0}")/..)"
 WORK_FOLDER="$PROJECT_FOLDER"/build/
 mkdir -p "$WORK_FOLDER"

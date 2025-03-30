@@ -48,6 +48,8 @@ POLY_save_register_begin:
 	mov [rsp + 64], r10
 POLY_save_register_end:
 
+	nop
+
 POLY_call_uncipher_begin:
 	; uncipher first part of the code
 	lea rdi, [rel program_entry]			; data = &program_entry
