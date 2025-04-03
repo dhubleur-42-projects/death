@@ -109,4 +109,4 @@ endstruc
 
 ; Compression
 %define COMPRESSION_TOKEN 127
-%define COMPRESSION_BUF_SIZE 50000
+%define COMPRESSION_BUF_SIZE 0x0B00 ; 0x0AE1 on commit 3a0747
